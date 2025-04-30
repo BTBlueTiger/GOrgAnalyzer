@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -12,38 +14,36 @@ import (
 	"github.com/kamalte/GOrgAnalyzer/analyze"
 )
 
-// GitHub language colors
-var githubLangColors = map[string]string{
-	"Go":          "#00ADD8",
-	"TypeScript":  "#3178C6",
-	"C#":          "#5C2D91",
-	"Python":      "#3776AB",
-	"Java":        "#b07219",
-	"JavaScript":  "#f1e05a",
-	"C++":         "#f34b7d",
-	"C":           "#555555",
-	"Ruby":        "#701516",
-	"PHP":         "#4F5D95",
-	"HTML":        "#E34C26",
-	"CSS":         "#264DE4",
-	"Rust":        "#dea584",
-	"Swift":       "#ffac45",
-	"Kotlin":      "#A97BFF",
-	"Shell":       "#89E051",
-	"XML":         "#0060ac",
-	"YAML":        "#8A2BE2",
+// LoadGitLangColors loads the language colors from a JSON file.
+func LoadGitLangColors(filePath string) (map[string]string, error) {
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var langColors map[string]string
+	if err := json.Unmarshal(data, &langColors); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return langColors, nil
 }
 
-// generateProgressBarSVG creates an SVG graphic with a progress bar for language usage.
-func generateProgressBarSVG(langByteCounts map[string]int, totalBytes int, outputPath string) error {
-	const svgHeader = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="70" viewBox="0 0 600 70" style="background-color:#000000; font-family:Arial, sans-serif; border:2px solid #ffffff; border-radius:5px;">`
+func generateProgressBarSVG(langByteCounts map[string]int, totalBytes int, outputPath string, githubLangColors map[string]string) error {
+	const svgHeader = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="20" style="font-family:Arial, sans-serif;">`
 	const svgFooter = `</svg>`
 
 	var svgContent strings.Builder
 	svgContent.WriteString(svgHeader)
 
-	// Add title
-	
+	// Create a clipPath for the rounded corners
+	svgContent.WriteString(`
+		<defs>
+			<clipPath id="roundedClip">
+				<rect x="0" y="0" width="800" height="20" rx="10" ry="10"/>
+			</clipPath>
+		</defs>
+	`)
 
 	// Sort the languages by size in descending order
 	type langData struct {
@@ -59,12 +59,15 @@ func generateProgressBarSVG(langByteCounts map[string]int, totalBytes int, outpu
 	})
 
 	// Variables for progress bar
-	x, y, barHeight := 50.0, 20.0, 10.0
-	totalWidth := 500.0
+	x, barHeight := 0.0, 20.0 // Increased bar height for better visibility
+	totalWidth := 800.0
 	currentX := x
 
+	// Start the progress bar group, applying the clipPath
+	svgContent.WriteString(`<g clip-path="url(#roundedClip)">`)
+
 	// Generate progress bar segments
-	for i, data := range sortedLangs {
+	for _, data := range sortedLangs {
 		percentage := float64(data.byteCount) / float64(totalBytes)
 		barWidth := totalWidth * percentage
 
@@ -74,23 +77,16 @@ func generateProgressBarSVG(langByteCounts map[string]int, totalBytes int, outpu
 			color = fmt.Sprintf("#%06x", rand.Intn(0xFFFFFF))
 		}
 
-		// Determine rounded corners for the first and last segments
-		rxLeft, ryRight := 0.0, 0.0
-		if i == 0 {
-			rxLeft = 10.0 // Rounded corners for the left side of the first segment
-		}
-		if i == len(sortedLangs)-1 {
-			ryRight = 10.0 // Rounded corners for the right side of the last segment
-		}
-
 		// Add the rectangle for the segment
 		svgContent.WriteString(fmt.Sprintf(
-			`<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" rx="%.2f" ry="%.2f" fill="%s" />`,
-			currentX, y, barWidth, barHeight, rxLeft, ryRight, color,
+			`<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="%s" />`,
+			currentX, 0.0, barWidth, barHeight, color,
 		))
-
 		currentX += barWidth
 	}
+
+	// End the group element that applies the clipPath
+	svgContent.WriteString(`</g>`)
 
 	svgContent.WriteString(svgFooter)
 
@@ -129,6 +125,13 @@ func main() {
 		log.Fatalf("Error reading base directory: %v", err)
 	}
 
+	// Load GitHub language colors from JSON file
+	langColorsPath := "./git_lang_colors.json"
+	githubLangColors, err := LoadGitLangColors(langColorsPath)
+	if err != nil {
+		log.Fatalf("Error loading language colors: %v", err)
+	}
+
 	totalLangCounts := make(map[string]int)
 	totalBytesAnalyzed := 0
 
@@ -154,8 +157,8 @@ func main() {
 		}
 
 		// Generate cumulative progress bar SVG graphic
-		progressBarOutputPath := filepath.Join(basePath, "./cumulative_language_progress_bar.svg")
-		err = generateProgressBarSVG(totalLangCounts, totalBytesAnalyzed, progressBarOutputPath)
+		progressBarOutputPath := "./cumulative_language_progress_bar.svg"
+		err = generateProgressBarSVG(totalLangCounts, totalBytesAnalyzed, progressBarOutputPath, githubLangColors)
 		if err != nil {
 			log.Printf("Error generating progress bar SVG: %v", err)
 		} else {

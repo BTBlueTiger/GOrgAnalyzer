@@ -1,0 +1,20 @@
+{
+    "Go":          "#00ADD8",
+	"TypeScript":  "#3178C6",
+	"C#":          "#5C2D91",
+	"Python":      "#3776AB",
+	"Java":        "#b07219",
+	"JavaScript":  "#f1e05a",
+	"C++":         "#f34b7d",
+	"C":           "#555555",
+	"Ruby":        "#701516",
+	"PHP":         "#4F5D95",
+	"HTML":        "#E34C26",
+	"CSS":         "#264DE4",
+	"Rust":        "#dea584",
+	"Swift":       "#ffac45",
+	"Kotlin":      "#A97BFF",
+	"Shell":       "#89E051",
+	"XML":         "#0060ac",
+	"YAML":        "#8A2BE2"
+}
